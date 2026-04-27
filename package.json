@@ -1,0 +1,26 @@
+{
+  "name": "websiteprev",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI tool to capture website screenshots after deployment",
+  "bin": {
+    "websiteprev": "./src/cli/index.js"
+  },
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "puppeteer": "^22.0.0",
+    "cloudinary": "^2.0.0",
+    "commander": "^12.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["screenshot", "cli", "ci", "deployment", "preview"],
+  "license": "MIT"
+}
