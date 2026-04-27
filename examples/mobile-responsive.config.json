@@ -1,0 +1,41 @@
+{
+  "storage": {
+    "adapter": "cloudinary",
+    "options": {
+      "folder": "myapp/screenshots"
+    }
+  },
+  "browser": {
+    "width": 1280,
+    "height": 800,
+    "fullPage": true,
+    "waitUntil": "networkidle2",
+    "delayMs": 0
+  },
+  "shots": [
+    {
+      "url": "https://example.com",
+      "name": "home-desktop",
+      "output": "public/images/home-desktop.png"
+    },
+    {
+      "url": "https://example.com",
+      "name": "home-mobile",
+      "output": "public/images/home-mobile.png",
+      "browser": {
+        "width": 375,
+        "height": 667,
+        "fullPage": false
+      }
+    },
+    {
+      "url": "https://example.com",
+      "name": "home-tablet",
+      "output": "public/images/home-tablet.png",
+      "browser": {
+        "width": 768,
+        "height": 1024
+      }
+    }
+  ]
+}

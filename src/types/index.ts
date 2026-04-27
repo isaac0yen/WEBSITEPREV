@@ -4,6 +4,8 @@ export interface BrowserConfig {
   fullPage: boolean;
   waitUntil: 'load' | 'domcontentloaded' | 'networkidle0' | 'networkidle2';
   delayMs: number;
+  userAgent?: string;
+  extraHeaders?: Record<string, string>;
 }
 
 export interface Shot {

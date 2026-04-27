@@ -5,3 +5,6 @@ websiteprev.manifest.json
 screenshots/
 *.log
 .DS_Store
+
+# Keep example configs
+!examples/*.config.json

@@ -1,0 +1,25 @@
+{
+  "storage": {
+    "adapter": "filesystem",
+    "options": {}
+  },
+  "browser": {
+    "width": 1280,
+    "height": 800,
+    "fullPage": true,
+    "waitUntil": "networkidle2",
+    "delayMs": 0
+  },
+  "shots": [
+    {
+      "url": "https://example.com",
+      "name": "home",
+      "output": "screenshots/home.png"
+    },
+    {
+      "url": "https://example.com/about",
+      "name": "about",
+      "output": "screenshots/about.png"
+    }
+  ]
+}

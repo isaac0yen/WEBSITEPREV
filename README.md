@@ -102,10 +102,60 @@ Place `websiteprev.config.json` in your project root:
 | `browser.fullPage` | No | Capture full scrollable page (default: true) |
 | `browser.waitUntil` | No | Puppeteer wait condition (default: "networkidle2") |
 | `browser.delayMs` | No | Extra wait after page load (default: 0) |
+| `browser.userAgent` | No | Custom user agent string (default: Chrome on Windows) |
+| `browser.extraHeaders` | No | Additional HTTP headers as key-value pairs |
 | `shots[].url` | Yes | Full URL to screenshot |
 | `shots[].name` | Yes | Slug identifier (lowercase, hyphens only) |
 | `shots[].output` | Yes | Output path reference |
 | `shots[].browser` | No | Per-shot browser overrides |
+
+## Handling Cloudflare and Bot Protection
+
+If your site uses Cloudflare or similar bot protection, you may encounter challenge pages. Here's how to handle them:
+
+### Option 1: Increase Delay
+
+Add a delay to let the page fully load after any challenges:
+
+```json
+{
+  "browser": {
+    "delayMs": 5000
+  }
+}
+```
+
+### Option 2: Custom Headers
+
+Some protections check for specific headers:
+
+```json
+{
+  "browser": {
+    "extraHeaders": {
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept": "text/html,application/xhtml+xml"
+    }
+  }
+}
+```
+
+### Option 3: Whitelist CI IP
+
+The most reliable approach: whitelist your CI/CD IP addresses in Cloudflare's firewall rules. This bypasses challenges entirely for automated requests.
+
+### Option 4: Use a Different Wait Condition
+
+Try `networkidle0` instead of `networkidle2`:
+
+```json
+{
+  "browser": {
+    "waitUntil": "networkidle0",
+    "delayMs": 3000
+  }
+}
+```
 
 ## Adapters
 
@@ -151,6 +201,8 @@ https://res.cloudinary.com/{cloud_name}/image/upload/{folder}/{name}.png
 ```
 
 This means you can hardcode the URL in your HTML before the first screenshot is even taken. Each run overwrites the image in place.
+
+**Important:** Cloudinary adds version numbers to URLs internally (e.g., `v1777284122`), but you should always use the versionless URL shown above. When you request the versionless URL, Cloudinary automatically serves the latest version. This keeps your URLs deterministic and unchanging.
 
 ## CI/CD Integration
 
@@ -226,3 +278,40 @@ await websiteprev({
 ## License
 
 MIT
+
+## Troubleshooting
+
+### "URL mismatch" error with Cloudinary
+
+This has been fixed in the latest version. Cloudinary adds version numbers to URLs internally, but the tool now returns versionless URLs which are deterministic and always work.
+
+### Cloudflare challenge detected
+
+Your site is blocking automated browsers. Solutions:
+1. Whitelist your CI IP in Cloudflare (most reliable)
+2. Increase `delayMs` to 5000+ milliseconds
+3. Add custom headers (see examples/cloudflare-protected.config.json)
+4. Use `waitUntil: "networkidle0"` instead of `networkidle2`
+
+### Screenshots are blank or incomplete
+
+The page may not be fully loaded. Try:
+1. Increase `delayMs` (e.g., 3000 for 3 seconds)
+2. Change `waitUntil` to `"networkidle0"` (stricter)
+3. Set `fullPage: false` if the page has infinite scroll
+
+### Navigation timeout
+
+The page took too long to load. The default timeout is 60 seconds. Check:
+1. Is the URL correct and accessible?
+2. Is the site actually deployed?
+3. Does the site have slow-loading resources?
+
+### Missing environment variables (Cloudinary)
+
+Make sure these are set in your CI environment:
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+Check your CI provider's documentation for setting secrets.

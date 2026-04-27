@@ -8,7 +8,9 @@ const DEFAULT_BROWSER_CONFIG: BrowserConfig = {
   height: 800,
   fullPage: true,
   waitUntil: 'networkidle2',
-  delayMs: 0
+  delayMs: 0,
+  userAgent: undefined,
+  extraHeaders: undefined
 };
 
 function validateShot(shot: unknown, index: number): string[] {
