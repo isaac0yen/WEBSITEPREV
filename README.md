@@ -1,6 +1,28 @@
 # websiteprev
 
-An npm CLI package that captures website screenshots after deployment. Language-agnostic — works with any project (PHP, Rust, TypeScript, etc.).
+Capture website screenshots after deployment in CI/CD. Language-agnostic — works with any project.
+
+**This is a CI/CD tool.** It runs in your pipeline after deployment, not locally. Running it locally defeats the purpose — you'd screenshot localhost instead of your live production site.
+
+## The Problem
+
+You need screenshot URLs in your code BEFORE deployment, but screenshots can only be taken AFTER deployment. This tool solves it with deterministic URLs.
+
+## How It Works
+
+### For Cloudinary (CDN):
+1. Create config, run `websiteprev url home` to get the URL
+2. Hardcode that URL in your OG tags: `<meta property="og:image" content="https://...">`
+3. Commit and push
+4. CI deploys, then runs `websiteprev run` to upload screenshot to that exact URL
+5. Done. Every deploy updates the image, URL never changes.
+
+### For Filesystem (local files):
+1. Create config with output paths like `public/images/home.png`
+2. Reference that path in your code: `<img src="/images/home.png">`
+3. Commit and push
+4. CI deploys, then runs `websiteprev run` to generate the file
+5. Done. File is in your build output, path never changes.
 
 ## Installation
 
@@ -11,47 +33,58 @@ npm install websiteprev
 ## Quick Start
 
 ```bash
-# Initialize a config file
+# 1. Create config (locally)
 npx websiteprev init
 
-# Edit websiteprev.config.json with your URLs
+# 2. Edit websiteprev.config.json with your production URLs
 
-# Run after deployment
+# 3. Get deterministic URL (locally)
+npx websiteprev url home
+# Output: home → https://res.cloudinary.com/.../home.png
+
+# 4. Hardcode that URL in your OG tags
+# <meta property="og:image" content="https://res.cloudinary.com/.../home.png">
+
+# 5. Commit and push
+
+# 6. In CI (after deployment):
 npx websiteprev run
+
+# 7. CI commits manifest back to repo
+git add websiteprev.manifest.json
+git commit -m "Update screenshots [skip ci]"
+git push
 ```
 
 ## CLI Commands
 
+### `websiteprev init`
+
+Creates `websiteprev.config.json` template. Do this locally, then follow the workflow above.
+
+### `websiteprev url <name>`
+
+Get deterministic URL for a shot. Run this locally before your first CI run to get the URL to hardcode in your code.
+
+```bash
+npx websiteprev url home
+# Cloudinary: home → https://res.cloudinary.com/mycloud/image/upload/folder/home.png
+# Filesystem: home → public/images/home.png (local path)
+```
+
 ### `websiteprev run`
 
-Runs the full screenshot pipeline.
+Take screenshots of live deployed site. Runs in CI after deployment, not locally.
 
 ```bash
 npx websiteprev run
 npx websiteprev run --config ./path/to/config.json
-npx websiteprev run --dry-run
+npx websiteprev run --dry-run  # Validate without taking screenshots
 ```
-
-Options:
-- `--config <path>`: Path to config file (default: `./websiteprev.config.json`)
-- `--dry-run`: Validate config and print what would run without taking screenshots
-
-### `websiteprev init`
-
-Creates a template `websiteprev.config.json` in the current directory.
 
 ### `websiteprev validate`
 
-Validates the config file without running any screenshots.
-
-### `websiteprev url <name>`
-
-Prints the deterministic URL for a named shot. Use this to get the URL to hardcode in your HTML before your first run.
-
-```bash
-npx websiteprev url home
-# Output: home → https://res.cloudinary.com/mycloud/image/upload/myapp/screenshots/home.png
-```
+Validate config file. For local use and pre-commit hooks. Not needed in CI.
 
 ## Config File Schema
 
@@ -206,30 +239,91 @@ This means you can hardcode the URL in your HTML before the first screenshot is 
 
 ## CI/CD Integration
 
-**Important:** Always deploy BEFORE running `websiteprev`.
+**The sequence:** Build → Deploy → Run websiteprev → Commit manifest → Push
+
+This tool screenshots your LIVE production site, so it must run after deployment.
 
 ### GitHub Actions
 
 ```yaml
-- name: Deploy
-  run: # your deploy command
+name: Deploy and Screenshot
 
-- name: Take screenshots
-  run: npx websiteprev run
-  env:
-    CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-    CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-    CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      # 1. Build your project
+      - name: Build
+        run: npm run build
+      
+      # 2. Deploy to production
+      - name: Deploy
+        run: # your deploy command here
+      
+      # 3. Take screenshots of the LIVE site
+      - name: Capture screenshots
+        run: npx websiteprev run
+        env:
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+      
+      # 4. Commit the updated manifest back to the repo
+      - name: Commit manifest
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add websiteprev.manifest.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update screenshot manifest [skip ci]"
+          git push
 ```
+
+**Setting up GitHub Secrets:**
+
+1. Go to your repository Settings > Secrets and variables > Actions
+2. Click "New repository secret"
+3. Add these three secrets:
+   - `CLOUDINARY_CLOUD_NAME` - Your Cloudinary cloud name
+   - `CLOUDINARY_API_KEY` - Your Cloudinary API key
+   - `CLOUDINARY_API_SECRET` - Your Cloudinary API secret
 
 ### GitLab CI
 
 ```yaml
+deploy:
+  stage: deploy
+  script:
+    - # your deploy command
+
 screenshots:
   stage: post-deploy
   script:
     - npx websiteprev run
+    - git config user.name "GitLab CI"
+    - git config user.email "ci@gitlab.com"
+    - git add websiteprev.manifest.json
+    - git diff --quiet && git diff --staged --quiet || git commit -m "Update screenshot manifest [skip ci]"
+    - git push https://oauth2:${CI_PUSH_TOKEN}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git HEAD:${CI_COMMIT_REF_NAME}
+  variables:
+    CLOUDINARY_CLOUD_NAME: $CLOUDINARY_CLOUD_NAME
+    CLOUDINARY_API_KEY: $CLOUDINARY_API_KEY
+    CLOUDINARY_API_SECRET: $CLOUDINARY_API_SECRET
 ```
+
+**Setting up GitLab Variables:**
+
+1. Go to Settings > CI/CD > Variables
+2. Add these three variables (mark as "Masked"):
+   - `CLOUDINARY_CLOUD_NAME`
+   - `CLOUDINARY_API_KEY`
+   - `CLOUDINARY_API_SECRET`
+3. Add `CI_PUSH_TOKEN` with a personal access token that has `write_repository` scope
 
 ### Any Shell
 
@@ -239,7 +333,7 @@ CLOUDINARY_CLOUD_NAME=xxx CLOUDINARY_API_KEY=yyy CLOUDINARY_API_SECRET=zzz npx w
 
 ## Manifest File
 
-After each run, `websiteprev.manifest.json` is written to your project root:
+After each run, `websiteprev.manifest.json` is written to your project root. Commit this file back to your repo.
 
 ```json
 {
@@ -257,7 +351,7 @@ After each run, `websiteprev.manifest.json` is written to your project root:
 }
 ```
 
-Import this in your build process:
+Your app can import this to get URLs dynamically:
 
 ```js
 import manifest from './websiteprev.manifest.json' assert { type: 'json' };

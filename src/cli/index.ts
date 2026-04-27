@@ -11,84 +11,66 @@ const program = new Command();
 
 program
   .name('websiteprev')
-  .description(`Capture website screenshots after deployment.
+  .description(`Capture website screenshots after deployment in CI/CD.
 
-WHY THIS EXISTS:
-You want a screenshot of your live site in your OG image tags, README, or app UI.
-But there's a timing problem: you need the image URL BEFORE you can write your HTML,
-yet the screenshot can only be taken AFTER deployment. This tool solves that paradox.
+THE PROBLEM:
+You need screenshot URLs in your code BEFORE deployment, but screenshots can
+only be taken AFTER deployment. This tool solves it with deterministic URLs.
 
-THE CORE CONCEPT:
-The image URL is deterministic and knowable in advance. When using Cloudinary,
-the URL follows a predictable formula:
-  https://res.cloudinary.com/{cloud_name}/image/upload/{folder}/{name}.png
+HOW IT WORKS:
 
-You define all these values in your config. The URL never changes. Each run
-overwrites the image in place, so your HTML never needs updating.
+For Cloudinary (CDN):
+  1. Create config, run 'websiteprev url home' to get the URL
+  2. Hardcode that URL in your OG tags: <meta property="og:image" content="https://...">
+  3. Commit and push
+  4. CI deploys, then runs 'websiteprev run' to upload screenshot to that exact URL
+  5. Done. Every deploy updates the image, URL never changes.
 
-HOW IT FITS IN YOUR PIPELINE:
-  1. Build your project
-  2. Deploy to production/staging
-  3. Run: npx websiteprev run  (screenshots the LIVE deployed site)
-  4. The manifest file is updated with current URLs
+For Filesystem (local files):
+  1. Create config with output paths like 'public/images/home.png'
+  2. Reference that path in your code: <img src="/images/home.png">
+  3. Commit and push
+  4. CI deploys, then runs 'websiteprev run' to generate the file
+  5. Done. File is in your build output, path never changes.
 
-The manifest (websiteprev.manifest.json) is the bridge between CI runs and your
-codebase. Commit it. Read it at build time. Your app always has current URLs.
+THIS RUNS IN CI, NOT LOCALLY:
+Running locally defeats the purpose — you'd screenshot localhost instead of
+your live production site. The correct CI sequence is:
+  Build → Deploy → Run websiteprev → Commit manifest → Push
 
-THREE WAYS TO USE THE URLS:
-  1. Hardcode: Run 'websiteprev url <name>' to get the URL, paste in HTML once
-  2. Manifest-driven: Import the manifest at build time, inject URLs dynamically
-  3. Proxy route: Serve URLs via an API route that reads the manifest at runtime
+Commands:
+  $ websiteprev init           Create config file
+  $ websiteprev url <name>     Get deterministic URL (before first run)
+  $ websiteprev run            Take screenshots (in CI after deploy)
+  $ websiteprev validate       Check config (locally before commit)
 
-Examples:
-  $ websiteprev init                    Create a config file
-  $ websiteprev run                     Take all screenshots
-  $ websiteprev run --dry-run           Preview without taking screenshots
-  $ websiteprev url home                Get the deterministic URL for a shot
-  $ websiteprev validate                Check config for errors
-
-Environment Variables (Cloudinary only):
-  CLOUDINARY_CLOUD_NAME   Your cloud name
-  CLOUDINARY_API_KEY      Your API key
-  CLOUDINARY_API_SECRET   Your API secret`)
+GitHub Secrets (Cloudinary only):
+  CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
+  Set in: Settings > Secrets and variables > Actions`)
   .version('0.1.0');
 
 // run command
 program
   .command('run')
-  .description(`Execute the full screenshot pipeline.
+  .description(`Take screenshots of live deployed site (CI only).
 
-WHAT HAPPENS:
-For each shot in your config, this command:
-  1. Launches a headless browser
-  2. Navigates to the configured URL
-  3. Waits for the page to stabilize (configurable)
-  4. Captures a screenshot
-  5. Uploads to filesystem or Cloudinary
-  6. Records the result in the manifest
+RUNS IN CI AFTER DEPLOYMENT:
+This screenshots your LIVE production URLs. Running locally is pointless —
+you'd screenshot localhost. The CI sequence is:
+  1. Build → 2. Deploy → 3. Run this command → 4. Commit manifest
 
-WHY IT MUST RUN AFTER DEPLOYMENT:
-This tool screenshots LIVE URLs. If your deployment hasn't completed, you'll
-capture the old version or get a connection error. The deployment step is YOUR
-responsibility — this tool just visits whatever is currently at the URL.
+WHAT IT DOES:
+  - Launches headless browser for each configured shot
+  - Visits the live URL and captures screenshot
+  - Uploads to Cloudinary or saves to filesystem
+  - Writes websiteprev.manifest.json with results
+  - Exit code 0 if all succeeded, 1 if any failed
 
-THE MANIFEST FILE:
-After completion, websiteprev.manifest.json is written to your project root.
-It contains every shot's status and URL. This file should be committed to your
-repository. It's how your build process or app knows where the images live.
-
-ERROR HANDLING:
-If one shot fails, the others continue. All errors are recorded in the manifest.
-Exit code is 0 if all succeeded, 1 if any failed. This lets CI fail gracefully.`)
+THE MANIFEST:
+Contains URLs and status for each shot. Must be committed back to repo after
+this runs. Your app can import it to get current screenshot URLs dynamically.`)
   .option('--config <path>', 'Path to config file (default: ./websiteprev.config.json)')
-  .option('--dry-run', `Validate config and print what would run without taking screenshots.
-
-Use this to:
-  - Verify your config is correct before running in CI
-  - See the deterministic URLs that will be generated
-  - Debug adapter configuration without making network calls
-
-No browser is launched. No uploads happen. Pure validation and preview.`)
+  .option('--dry-run', 'Validate config and preview URLs without taking screenshots')
   .action(async (options) => {
     try {
       const result = await run({
@@ -107,21 +89,17 @@ No browser is launched. No uploads happen. Pure validation and preview.`)
 // init command
 program
   .command('init')
-  .description(`Create a template websiteprev.config.json file.
+  .description(`Create websiteprev.config.json template.
 
-WHAT YOU GET:
-A config with sensible defaults:
-  - Filesystem adapter (no external services needed)
-  - Two example shots to show the structure
-  - Browser settings optimized for most sites
+WORKFLOW AFTER INIT:
+  1. Edit config with your production URLs and adapter choice
+  2. Run 'websiteprev url <name>' to get deterministic URLs
+  3. Hardcode those URLs in your OG tags or code
+  4. Commit config + your code changes
+  5. Push to trigger CI
+  6. CI deploys then runs 'websiteprev run' to populate the URLs
 
-NEXT STEPS:
-  1. Edit the URLs to match your site
-  2. Change the adapter to 'cloudinary' if you want CDN URLs
-  3. Add more shots for different pages/viewport sizes
-  4. Run 'websiteprev run' to capture
-
-The config file should be committed to your repository.`)
+Config should be committed to your repository.`)
   .action(() => {
     const configPath = resolve('./websiteprev.config.json');
     
@@ -164,21 +142,12 @@ The config file should be committed to your repository.`)
 // validate command
 program
   .command('validate')
-  .description(`Validate the config file without running any screenshots.
+  .description(`Validate config file (local use, pre-commit hooks).
 
-WHAT IT CHECKS:
-  - Required fields are present (storage.adapter, shots array)
-  - Shot names are valid (lowercase, hyphens only)
-  - URLs are strings
-  - Browser settings have correct types
-  - Cloudinary adapter has folder configured
+Checks required fields, shot names, URLs, and adapter settings.
+Exit code 0 = valid, 1 = invalid.
 
-WHEN TO USE:
-  - In CI before the deploy step (catch config errors early)
-  - After editing the config (verify before running)
-  - In a pre-commit hook (prevent invalid configs)
-
-Exit code 0 = valid, 1 = invalid. Easy to use in scripts.`)
+Not needed in CI — 'run' command validates automatically.`)
   .option('--config <path>', 'Path to config file (default: ./websiteprev.config.json)')
   .action(async (options) => {
     try {
@@ -194,30 +163,18 @@ Exit code 0 = valid, 1 = invalid. Easy to use in scripts.`)
 // url command
 program
   .command('url <name>')
-  .description(`Print the deterministic URL for a named shot.
+  .description(`Get deterministic URL for a shot (before first CI run).
 
-THE KEY INSIGHT:
-The URL is computed from your config, not generated by the upload service.
-This means you can know the URL before any screenshot exists. You can put
-this URL in your HTML today, and the image will appear there after your
-first CI run.
+THE WORKFLOW:
+  1. Create config with 'websiteprev init'
+  2. Run this command to get the URL
+  3. Hardcode URL in your OG tags: <meta property="og:image" content="...">
+  4. Commit and push
+  5. CI runs 'websiteprev run' to populate that URL with actual screenshot
 
-FOR CLOUDINARY:
-Prints the full CDN URL. This URL will work forever. Each run overwrites
-the image at this exact location. The URL never changes.
-
-  Example: home → https://res.cloudinary.com/mycloud/image/upload/folder/home.png
-
-FOR FILESYSTEM:
-Prints the local output path. This is where the file will be written.
-Use this path in your code to reference the screenshot.
-
-  Example: home → screenshots/home.png (local path)
-
-USE CASES:
-  1. First-time setup: Get the URL to hardcode in your HTML
-  2. Debugging: Verify the URL matches what you expect
-  3. Documentation: Show where images will be stored`)
+The URL is computed from your config, not generated by the service.
+For Cloudinary: full CDN URL that never changes.
+For filesystem: local path like 'public/images/home.png'.`)
   .option('--config <path>', 'Path to config file (default: ./websiteprev.config.json)')
   .action(async (name, options) => {
     try {
