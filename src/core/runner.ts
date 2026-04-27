@@ -2,13 +2,14 @@ import { loadConfig } from './config.js';
 import { takeScreenshot } from './screenshot.js';
 import { writeManifest } from './manifest.js';
 import { createAdapter } from '../adapters/index.js';
+import type { RunResult, RunOptions, ShotResult, BrowserConfig } from '../types/index.js';
 
-export async function run(options = {}) {
+export async function run(options: RunOptions = {}): Promise<RunResult> {
   const { config: configPath, env, dryRun = false } = options;
   
   // Load and validate config
   const config = await loadConfig(configPath);
-  const adapter = createAdapter(config.storage, env, config._projectRoot);
+  const adapter = createAdapter(config.storage, env || {}, config._projectRoot!);
   
   console.log(`Loaded config from: ${config._configPath}`);
   console.log(`Adapter: ${config.storage.adapter}`);
@@ -24,11 +25,11 @@ export async function run(options = {}) {
       console.log(`  Expected: ${expectedUrl || `local path: ${shot.output}`}`);
     }
     console.log('\nDry run complete. No screenshots taken.');
-    return { success: true, dryRun: true };
+    return { success: true, dryRun: true, successCount: 0, errorCount: 0, manifestPath: '', results: [] };
   }
   
   // Process each shot
-  const results = [];
+  const results: ShotResult[] = [];
   let successCount = 0;
   let errorCount = 0;
   
@@ -36,7 +37,7 @@ export async function run(options = {}) {
     console.log(`\nProcessing: ${shot.name} (${shot.url})`);
     
     // Take screenshot
-    const screenshotResult = await takeScreenshot(shot, config.browser);
+    const screenshotResult = await takeScreenshot(shot, config.browser as BrowserConfig);
     
     if (!screenshotResult.success) {
       console.error(`  Screenshot failed: ${screenshotResult.error}`);
@@ -55,7 +56,7 @@ export async function run(options = {}) {
     // Upload via adapter
     try {
       const uploadResult = await adapter.upload(
-        screenshotResult.tempPath,
+        screenshotResult.tempPath!,
         shot.name,
         shot.output
       );
@@ -71,24 +72,21 @@ export async function run(options = {}) {
       });
       successCount++;
     } catch (error) {
-      console.error(`  Upload failed: ${error.message}`);
+      console.error(`  Upload failed: ${(error as Error).message}`);
       results.push({
         name: shot.name,
         url: shot.url,
         output: shot.output,
         remoteUrl: adapter.getExpectedUrl(shot.name),
         status: 'error',
-        error: error.message
+        error: (error as Error).message
       });
       errorCount++;
     }
   }
   
   // Write manifest
-  const manifestPath = await writeManifest(config._configPath, {
-    adapter: config.storage.adapter,
-    shots: results
-  });
+  const manifestPath = await writeManifest(config._configPath!, config.storage.adapter, results);
   
   console.log(`\nManifest written to: ${manifestPath}`);
   console.log(`\nSummary: ${successCount} succeeded, ${errorCount} failed`);

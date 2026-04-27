@@ -1,14 +1,17 @@
 import { copyFileSync, mkdirSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { BaseAdapter } from './base.js';
+import type { AdapterUploadResult } from '../types/index.js';
 
-class FilesystemAdapter extends BaseAdapter {
-  constructor(options, env, projectRoot) {
+export class FilesystemAdapter extends BaseAdapter {
+  private projectRoot: string;
+
+  constructor(options: Record<string, unknown> | undefined, env: Record<string, string | undefined>, projectRoot: string) {
     super(options, env);
     this.projectRoot = projectRoot;
   }
 
-  async upload(filePath, name, outputPath) {
+  async upload(filePath: string, name: string, outputPath: string): Promise<AdapterUploadResult> {
     const resolvedOutputPath = resolve(this.projectRoot, outputPath);
     const outputDir = dirname(resolvedOutputPath);
     
@@ -26,9 +29,7 @@ class FilesystemAdapter extends BaseAdapter {
     };
   }
 
-  getExpectedUrl(name) {
+  getExpectedUrl(_name: string): null {
     return null;
   }
 }
-
-export { FilesystemAdapter };

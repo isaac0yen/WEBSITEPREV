@@ -1,12 +1,16 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { BaseAdapter } from './base.js';
+import type { AdapterUploadResult } from '../types/index.js';
 
-class CloudinaryAdapter extends BaseAdapter {
-  constructor(options, env) {
+export class CloudinaryAdapter extends BaseAdapter {
+  private cloudName: string;
+  private folder: string;
+
+  constructor(options: Record<string, unknown> | undefined, env: Record<string, string | undefined>) {
     super(options, env);
     
     // Validate required environment variables
-    const missing = [];
+    const missing: string[] = [];
     if (!env.CLOUDINARY_CLOUD_NAME) missing.push('CLOUDINARY_CLOUD_NAME');
     if (!env.CLOUDINARY_API_KEY) missing.push('CLOUDINARY_API_KEY');
     if (!env.CLOUDINARY_API_SECRET) missing.push('CLOUDINARY_API_SECRET');
@@ -15,8 +19,8 @@ class CloudinaryAdapter extends BaseAdapter {
       throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
     }
     
-    this.cloudName = env.CLOUDINARY_CLOUD_NAME;
-    this.folder = options.folder;
+    this.cloudName = env.CLOUDINARY_CLOUD_NAME as string;
+    this.folder = (options?.folder as string) || '';
     
     // Configure cloudinary
     cloudinary.config({
@@ -26,11 +30,11 @@ class CloudinaryAdapter extends BaseAdapter {
     });
   }
 
-  getExpectedUrl(name) {
+  getExpectedUrl(name: string): string {
     return `https://res.cloudinary.com/${this.cloudName}/image/upload/${this.folder}/${name}.png`;
   }
 
-  async upload(filePath, name, outputPath) {
+  async upload(filePath: string, name: string, outputPath: string): Promise<AdapterUploadResult> {
     const expectedUrl = this.getExpectedUrl(name);
     
     const result = await cloudinary.uploader.upload(filePath, {
@@ -55,5 +59,3 @@ class CloudinaryAdapter extends BaseAdapter {
     };
   }
 }
-
-export { CloudinaryAdapter };

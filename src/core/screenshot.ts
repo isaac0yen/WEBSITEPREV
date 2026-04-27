@@ -1,14 +1,21 @@
 import puppeteer from 'puppeteer';
+import type { Shot, BrowserConfig } from '../types/index.js';
 
-export async function takeScreenshot(shot, browserConfig) {
-  const config = { ...browserConfig, ...shot.browser };
+interface ScreenshotResult {
+  success: boolean;
+  tempPath?: string;
+  error?: string;
+}
+
+export async function takeScreenshot(shot: Shot, browserConfig: BrowserConfig): Promise<ScreenshotResult> {
+  const config: BrowserConfig = { ...browserConfig, ...shot.browser };
   const { width, height, fullPage, waitUntil, delayMs } = config;
   
   const browser = await puppeteer.launch({
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
   
-  let page = null;
+  let page: puppeteer.Page | null = null;
   const tempPath = `/tmp/${shot.name}.png`;
   
   try {
@@ -27,25 +34,9 @@ export async function takeScreenshot(shot, browserConfig) {
     return { success: true, tempPath };
   } catch (error) {
     if (page) {
-      try { await page.close(); } catch (e) {}
+      try { await page.close(); } catch { /* ignore */ }
     }
-    try { await browser.close(); } catch (e) {}
-    return { success: false, error: error.message };
+    try { await browser.close(); } catch { /* ignore */ }
+    return { success: false, error: (error as Error).message };
   }
-}
-
-export async function takeAllScreenshots(shots, browserConfig) {
-  const results = [];
-  
-  for (const shot of shots) {
-    const result = await takeScreenshot(shot, browserConfig);
-    results.push({
-      name: shot.name,
-      url: shot.url,
-      output: shot.output,
-      ...result
-    });
-  }
-  
-  return results;
 }

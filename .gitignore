@@ -1,4 +1,5 @@
 node_modules/
+dist/
 websiteprev.config.json
 websiteprev.manifest.json
 screenshots/
