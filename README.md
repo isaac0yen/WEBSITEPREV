@@ -1,5 +1,8 @@
 # websiteprev
 
+[![npm version](https://badge.fury.io/js/websiteprev.svg)](https://www.npmjs.com/package/websiteprev)
+[![GitHub](https://img.shields.io/github/license/isaac0yen/WEBSITEPREV)](https://github.com/isaac0yen/WEBSITEPREV)
+
 Capture website screenshots after deployment in CI/CD. Language-agnostic — works with any project.
 
 **This is a CI/CD tool.** It runs in your pipeline after deployment, not locally. Running it locally defeats the purpose — you'd screenshot localhost instead of your live production site.
@@ -372,6 +375,12 @@ await websiteprev({
 ## License
 
 MIT
+
+## Links
+
+- [npm package](https://www.npmjs.com/package/websiteprev)
+- [GitHub repository](https://github.com/isaac0yen/WEBSITEPREV)
+- [Report issues](https://github.com/isaac0yen/WEBSITEPREV/issues)
 
 ## Troubleshooting
 
